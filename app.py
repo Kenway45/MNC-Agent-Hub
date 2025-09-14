@@ -52,23 +52,41 @@ DOCS = {
 # Employee activity log
 EMPLOYEE_LOG = []
 
-# Initialize MCP Integration
-mcp_integration = MCPIntegration(app)
-mcp_integration.setup_integration(DOCS, EMPLOYEE_LOG)
+# Initialize MCP Integration (optional)
+mcp_integration = None
+try:
+    mcp_integration = MCPIntegration(app)
+    mcp_integration.setup_integration(DOCS, EMPLOYEE_LOG)
+    logger.info("MCP integration initialized successfully")
+except Exception as e:
+    logger.warning(f"MCP integration failed to initialize: {e}")
+    logger.info("Continuing without MCP server - core functionality will still work")
 
 # Start MCP server on application startup
 @app.on_event("startup")
 async def startup_event():
     """Start MCP server when main app starts"""
-    logger.info("Starting MCP server integration...")
-    mcp_integration.start_mcp_server()
-    logger.info("MNC Agent Hub with MCP server ready!")
+    logger.info("Starting Agent Hub...")
+    if mcp_integration:
+        try:
+            logger.info("Starting MCP server integration...")
+            mcp_integration.start_mcp_server()
+            logger.info("MNC Agent Hub with MCP server ready!")
+        except Exception as e:
+            logger.error(f"MCP server failed to start: {e}")
+            logger.info("Continuing without MCP server")
+    else:
+        logger.info("MNC Agent Hub ready (without MCP server)!")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Stop MCP server when main app shuts down"""
-    logger.info("Shutting down MCP server...")
-    mcp_integration.stop_mcp_server()
+    logger.info("Shutting down Agent Hub...")
+    if mcp_integration:
+        try:
+            mcp_integration.stop_mcp_server()
+        except Exception as e:
+            logger.error(f"Error stopping MCP server: {e}")
 
 class DocumentUpload(BaseModel):
     title: str
@@ -86,20 +104,29 @@ class EmployeeQuery(BaseModel):
 def call_ollama_for_json(prompt: str, model: str = "deepseek-coder:6.7b"):
     try:
         r = requests.post("http://localhost:11434/api/generate",
-                         json={"model": model, "prompt": prompt, "stream": False})
-        if r.status_code != 200:
-            return {"summary": "AI service unavailable", "action_items": []}
-        raw = r.text
-    except:
-        raw = '{"summary": "AI service unavailable", "action_items": []}'
-    
-    m = re.search(r"(\{.*\})", str(raw), flags=re.DOTALL)
-    if m:
-        try:
-            return json.loads(m.group(1))
-        except Exception:
-            pass
-    return {"summary": str(raw), "action_items": []}
+                         json={"model": model, "prompt": prompt, "stream": False}, timeout=30)
+        if r.status_code == 200:
+            result = r.json()
+            raw = result.get("response", "")
+            
+            # Try to extract JSON from response
+            m = re.search(r"(\{.*\})", str(raw), flags=re.DOTALL)
+            if m:
+                try:
+                    return json.loads(m.group(1))
+                except Exception:
+                    pass
+            
+            # If no JSON found, create basic summary
+            return {"summary": raw.strip()[:200] + "..." if len(raw) > 200 else raw.strip(), "action_items": []}
+        else:
+            return {"summary": "AI service returned error", "action_items": []}
+    except requests.exceptions.ConnectionError:
+        return {"summary": "AI service unavailable - Please ensure Ollama is running", "action_items": ["Install Ollama", "Run 'ollama serve'", "Pull deepseek-coder model"]}
+    except requests.exceptions.Timeout:
+        return {"summary": "AI request timed out - Service may be overloaded", "action_items": []}
+    except Exception as e:
+        return {"summary": f"AI service error: {str(e)}", "action_items": []}
 
 @app.get("/summarize/{doc_id}")
 async def summarize(doc_id: str, max_sentences: int = 3, model: str = "deepseek-coder:6.7b"):
@@ -796,13 +823,16 @@ async def employee_query(query: EmployeeQuery):
         
         try:
             r = requests.post("http://localhost:11434/api/generate",
-                             json={"model": "deepseek-coder:6.7b", "prompt": prompt, "stream": False})
+                             json={"model": "deepseek-coder:6.7b", "prompt": prompt, "stream": False}, timeout=30)
             if r.status_code == 200:
-                return {"response": r.json().get("response", "AI service unavailable")}
-        except:
-            pass
-        
-        return {"response": "AI service is currently unavailable. Please try again later."}
+                result = r.json()
+                return {"response": result.get("response", "AI service returned empty response")}
+        except requests.exceptions.ConnectionError:
+            return {"response": "AI service unavailable - Please ensure Ollama is running with deepseek-coder model"}
+        except requests.exceptions.Timeout:
+            return {"response": "AI request timed out - Please try again later"}
+        except Exception as e:
+            return {"response": f"AI service error: {str(e)}"}
     
     return {"response": "Query type not supported"}
 

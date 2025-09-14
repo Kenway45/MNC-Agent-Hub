@@ -32,5 +32,10 @@ echo ""
 # Change to the script directory
 cd "$(dirname "$0")"
 
+# Activate virtual environment if it exists
+if [ -d "agent_hub_env" ]; then
+    source agent_hub_env/bin/activate
+fi
+
 # Start the Agent Hub server
-python3 -m uvicorn app:app --host 0.0.0.0 --port 8888 --reload
+python3 -m uvicorn app:app --host 0.0.0.0 --port 8889 --reload

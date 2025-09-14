@@ -1,0 +1,55 @@
+[
+  {
+    "id": "doc_001",
+    "title": "Employee Handbook",
+    "category": "handbook",
+    "text": "Welcome to MNC Corporation. This handbook outlines company policies, procedures, and guidelines for all employees. Our company values include integrity, innovation, and collaboration. We provide comprehensive benefits including health insurance, retirement plans, and professional development opportunities.",
+    "tags": [
+      "hr",
+      "policy",
+      "benefits",
+      "guidelines"
+    ],
+    "uploaded_at": "2024-01-15T10:00:00Z",
+    "uploaded_by": "admin"
+  },
+  {
+    "id": "doc_002",
+    "title": "IT Security Policy",
+    "category": "policy",
+    "text": "All employees must follow strict security protocols. Use strong passwords, enable two-factor authentication, and never share login credentials. Report any suspicious activities immediately. All company data must be encrypted and backed up regularly.",
+    "tags": [
+      "security",
+      "policy",
+      "it",
+      "compliance"
+    ],
+    "uploaded_at": "2024-01-20T14:30:00Z",
+    "uploaded_by": "admin"
+  },
+  {
+    "id": "doc_003",
+    "title": "Remote Work Guidelines",
+    "category": "guideline",
+    "text": "Remote work is supported with proper equipment and guidelines. Employees must maintain regular communication, attend virtual meetings, and ensure secure internet connections. Work hours should align with team collaboration needs.",
+    "tags": [
+      "remote",
+      "work",
+      "guidelines",
+      "policy"
+    ],
+    "uploaded_at": "2024-02-01T09:15:00Z",
+    "uploaded_by": "admin"
+  },
+  {
+    "id": "doc_b539954c",
+    "title": "AI_IoT_Crop_Disease_1Page_Summary",
+    "text": "[Uploaded file: AI_IoT_Crop_Disease_1Page_Summary.docx - Content extraction would be implemented here]",
+    "tags": [
+      "general"
+    ],
+    "category": "policy",
+    "uploaded_by": "admin",
+    "uploaded_at": "2025-09-14T14:40:35.322530"
+  }
+]

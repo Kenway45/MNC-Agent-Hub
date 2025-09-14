@@ -48,21 +48,20 @@ async def get_admin_stats_endpoint(DOCS, EMPLOYEE_LOG):
     try:
         total_docs = len(DOCS)
         
-        # Count employees and queries from employee log
+        # Count employees and queries from employee log (in-memory list)
         employees = set()
-        total_queries = 0
+        total_queries = len(EMPLOYEE_LOG)
         today_queries = 0
         today = datetime.utcnow().date()
         
-        if os.path.exists(EMPLOYEE_LOG):
-            with open(EMPLOYEE_LOG, "r") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    employees.add(row["employee_id"])
-                    total_queries += 1
-                    query_date = datetime.fromisoformat(row["timestamp"]).date()
-                    if query_date == today:
-                        today_queries += 1
+        for log_entry in EMPLOYEE_LOG:
+            employees.add(log_entry.get("employee_id", ""))
+            try:
+                query_date = datetime.fromisoformat(log_entry.get("timestamp", "")).date()
+                if query_date == today:
+                    today_queries += 1
+            except:
+                pass
         
         return {
             "total_documents": total_docs,
@@ -94,16 +93,15 @@ async def get_employee_stats_endpoint(EMPLOYEE_LOG):
     try:
         employee_stats = defaultdict(lambda: {"query_count": 0, "last_activity": None})
         
-        if os.path.exists(EMPLOYEE_LOG):
-            with open(EMPLOYEE_LOG, "r") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    emp_id = row["employee_id"]
-                    timestamp = row["timestamp"]
-                    
-                    employee_stats[emp_id]["query_count"] += 1
-                    if not employee_stats[emp_id]["last_activity"] or timestamp > employee_stats[emp_id]["last_activity"]:
-                        employee_stats[emp_id]["last_activity"] = timestamp
+        # Process in-memory employee log
+        for log_entry in EMPLOYEE_LOG:
+            emp_id = log_entry.get("employee_id", "")
+            timestamp = log_entry.get("timestamp", "")
+            
+            if emp_id:
+                employee_stats[emp_id]["query_count"] += 1
+                if not employee_stats[emp_id]["last_activity"] or timestamp > employee_stats[emp_id]["last_activity"]:
+                    employee_stats[emp_id]["last_activity"] = timestamp
         
         result = []
         for emp_id, stats in employee_stats.items():
@@ -124,31 +122,32 @@ async def get_query_history_endpoint(employee_id, query_type, date, EMPLOYEE_LOG
     try:
         queries = []
         
-        if os.path.exists(EMPLOYEE_LOG):
-            with open(EMPLOYEE_LOG, "r") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    # Apply filters
-                    if employee_id and row["employee_id"] != employee_id:
+        # Process in-memory employee log
+        for log_entry in EMPLOYEE_LOG:
+            # Apply filters
+            if employee_id and log_entry.get("employee_id") != employee_id:
+                continue
+            if query_type and log_entry.get("query_type") != query_type:
+                continue
+            if date:
+                try:
+                    query_date = datetime.fromisoformat(log_entry.get("timestamp", "")).date().isoformat()
+                    if query_date != date:
                         continue
-                    if query_type and row["query_type"] != query_type:
-                        continue
-                    if date:
-                        query_date = datetime.fromisoformat(row["timestamp"]).date().isoformat()
-                        if query_date != date:
-                            continue
-                    
-                    queries.append({
-                        "timestamp": row["timestamp"],
-                        "query_id": row["query_id"],
-                        "employee_id": row["employee_id"],
-                        "query": row["query"],
-                        "query_type": row["query_type"],
-                        "doc_id": row["doc_id"] if row["doc_id"] else None
-                    })
+                except:
+                    continue
+            
+            queries.append({
+                "timestamp": log_entry.get("timestamp", ""),
+                "query_id": log_entry.get("query_id", ""),
+                "employee_id": log_entry.get("employee_id", ""),
+                "query": log_entry.get("query", ""),
+                "query_type": log_entry.get("query_type", ""),
+                "doc_id": log_entry.get("doc_id") or None
+            })
         
         # Sort by timestamp desc
-        queries.sort(key=lambda x: x["timestamp"], reverse=True)
+        queries.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         return queries[:100]  # Limit to 100 most recent
         
     except Exception as e:
@@ -162,18 +161,26 @@ async def get_analytics_endpoint(EMPLOYEE_LOG):
         query_type_counts = Counter()
         hourly_activity = Counter()
         
-        if os.path.exists(EMPLOYEE_LOG):
-            with open(EMPLOYEE_LOG, "r") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    employee_query_counts[row["employee_id"]] += 1
-                    if row["doc_id"]:
-                        document_access_counts[row["doc_id"]] += 1
-                    query_type_counts[row["query_type"]] += 1
-                    
-                    # Extract hour from timestamp
-                    hour = datetime.fromisoformat(row["timestamp"]).hour
-                    hourly_activity[hour] += 1
+        # Process in-memory employee log
+        for log_entry in EMPLOYEE_LOG:
+            emp_id = log_entry.get("employee_id", "")
+            doc_id = log_entry.get("doc_id")
+            query_type = log_entry.get("query_type", "")
+            timestamp = log_entry.get("timestamp", "")
+            
+            if emp_id:
+                employee_query_counts[emp_id] += 1
+            if doc_id:
+                document_access_counts[doc_id] += 1
+            if query_type:
+                query_type_counts[query_type] += 1
+            
+            # Extract hour from timestamp
+            try:
+                hour = datetime.fromisoformat(timestamp).hour
+                hourly_activity[hour] += 1
+            except:
+                pass
         
         # Calculate analytics
         total_employees = len(employee_query_counts)
