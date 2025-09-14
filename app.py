@@ -7,8 +7,16 @@ import re
 import requests
 from datetime import datetime
 import uuid
+import logging
 
-app = FastAPI(title="MNC Agent Hub", description="Enterprise Document Management System")
+# MCP Integration
+from mcp_integration import MCPIntegration
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="MNC Agent Hub", description="Enterprise Document Management System with MCP Integration")
 
 # Sample document database
 DOCS = {
@@ -43,6 +51,24 @@ DOCS = {
 
 # Employee activity log
 EMPLOYEE_LOG = []
+
+# Initialize MCP Integration
+mcp_integration = MCPIntegration(app)
+mcp_integration.setup_integration(DOCS, EMPLOYEE_LOG)
+
+# Start MCP server on application startup
+@app.on_event("startup")
+async def startup_event():
+    """Start MCP server when main app starts"""
+    logger.info("Starting MCP server integration...")
+    mcp_integration.start_mcp_server()
+    logger.info("MNC Agent Hub with MCP server ready!")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop MCP server when main app shuts down"""
+    logger.info("Shutting down MCP server...")
+    mcp_integration.stop_mcp_server()
 
 class DocumentUpload(BaseModel):
     title: str
